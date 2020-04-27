@@ -1,5 +1,6 @@
-const Notify = require('bnc-notify');
+const BlocknativeSDK = require('bnc-sdk');
 var Tx = require('ethereumjs-tx').Transaction;
+const WebSocket = require('ws');
 const Web3 = require('web3');
 const web3 = new Web3('https://rinkeby.infura.io/v3/0c9ee86cdadf410abb4d6eb1f134a97b');
 
@@ -7,10 +8,15 @@ const account1 = '0xc180F90Ff4bc68E9Af90a5F933eE08dee3d50C99';
 const account2 = '0xA880b18574e51d6A56486F6Dce28ef91a8A9a778';
 const privateKey1 = Buffer.from(process.env.PRIVATE_KEY_1, 'hex');
 
-var notify = Notify({
+const options = {
   dappId: '5faf9ea3-b2d4-4123-84f8-1dc3014acf92',       
-  networkId: 4
-});
+  networkId: 4,
+  transactionHandlers: [event => console.log(event.transaction)],
+  ws: WebSocket,
+  name: 'Instance 1'
+}
+
+const blocknative = new BlocknativeSDK(options);
 
 function getBalance(account){
 	web3.eth.getBalance(account, (err, bal) => {
@@ -37,14 +43,29 @@ function sendSignedTransactionViaWeb3(account1, account2, privateKey1) {
 		const raw = '0x' + serializedTransaction.toString('hex');
 
 		// Broadcast the transaction
-		web3.eth.sendSignedTransaction(raw).on('transactionHash', console.log);
+		web3.eth.sendSignedTransaction(raw).on('transactionHash', (transactionHash) => {
+			console.log(transactionHash);
+			const { emitter } = blocknative.transaction(transactionHash);
+			emitter.on('all', transaction => {
+				console.log(transaction);
+			})
+		});
 
+	})
+}
+
+function monitorTransaction(account) {
+	const { emitter, details} = blocknative.account(account);
+
+	emitter.on('all', transaction => {
+		console.log(transaction);
 	})
 }
 
 // getBalance(account1);
 // sendSignedTransactionViaWeb3(account1, account2, privateKey1);
 // getBalance(account2);
+monitorTransaction(account1);
 
 
 
